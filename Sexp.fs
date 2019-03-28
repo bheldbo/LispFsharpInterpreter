@@ -110,7 +110,7 @@ and readTail cs i len  =
   else
     let c = cs.[i]
     if c = ')' then Success (Nil, i+1)  // end of list
-    else if 'a' <= c &&  c <= 'z' || c = '+' then  // read symbol and then tail // Plus branch
+    else if 'a' <= c &&  c <= 'z' || c = '+' || c = '-' then  // read symbol and then tail // Plus branch
       match readSymbol (string c) cs (i+1) len with
       | ErrorAt j -> ErrorAt j
       | Success (sym, j) ->
