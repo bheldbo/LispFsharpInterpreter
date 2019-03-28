@@ -1,3 +1,6 @@
+dependencies
+fsharp 4 or above https://fsharp.org/use/windows/
+
 linux/mono session ->
 $bash compile.sh
 $mono lisp.exe
