@@ -26,6 +26,7 @@ and showTail d =
   | Symbol name -> " . " + name + ")"
   | Nil  -> ")"
   | Cons (a,d1) -> " " + showSexp a + showTail d1
+  | Number value -> " . " + (string value) + ")" // Integers
 
 
 // Type for success or failure for parsing
@@ -83,11 +84,11 @@ and readExp cs i len =
 // stop when end of string or non-letter reached
 
 and readInt value cs i len =
-  if i = len then Success (Number value, i)
+  if i = len then Success (Number (value-48), i)
   else
     let c = cs.[i]
     if '0' <= c && c <= '9' then
-      readInt ((value-48)*10 + (int c)) cs (i+1) len
+      readInt ((value-48)*10 + (int c)) cs (i+1) len // Ascii table translation for value 48..58 = 0..9
     else Success (Number (value-48), i)
 
 // read symbol (all lower case letters)
@@ -109,7 +110,7 @@ and readTail cs i len  =
   else
     let c = cs.[i]
     if c = ')' then Success (Nil, i+1)  // end of list
-    else if 'a' <= c &&  c <= 'z' then  // read symbol and then tail
+    else if 'a' <= c &&  c <= 'z' || c = '+' then  // read symbol and then tail // Plus branch
       match readSymbol (string c) cs (i+1) len with
       | ErrorAt j -> ErrorAt j
       | Success (sym, j) ->
@@ -148,6 +149,7 @@ and readTail cs i len  =
          | ErrorAt j -> ErrorAt j
          | Success (list, j) -> Success (Cons (sym, list), j)
     else ErrorAt i
+
 
 // read close parenthesis (possibly preceeded by whitespace)
 
