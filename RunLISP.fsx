@@ -439,6 +439,8 @@ and matchPattern p v =
        if List.contains x keywords
        then raise (Lerror ("keyword " + x + " can not be used in pattern"))
        else Some [(x, w)]
+  | (Number x, Number v) ->
+    if x=v then Some []  else None
   | (Cons (p1, p2), Cons (v1, v2)) ->
        match (matchPattern p1 v1, matchPattern p2 v2) with
        | (Some env1, Some env2) ->
@@ -452,7 +454,8 @@ and disjoint env1 env2 =
   | [] -> true
   | (x,v) :: env3 ->
        match lookup env2 x with
-       | Some _ -> raise (Lerror ("repeated variable " + x + " in pattern"))
+       | Some _ -> if Some v = lookup env2 x then disjoint env3 env2 else
+                      raise (Lerror ("repeated variable " + x + " in pattern"))
        | None -> disjoint env3 env2
 
 and quoteExp v =
