@@ -45,7 +45,7 @@ let updateGlobal x v =
 exception Lerror of string
 
 // list of keywords
-let keywords = ["quote"; "lambda"; "define"; "cons"; "save"; "load"; "+";]
+let keywords = ["quote"; "lambda"; "define"; "cons"; "save"; "load"; "+"; "-"; "*"; "/"]
 
 // evaluate Sexp to Sexp in local environment
 // if error raise exception Lerror message
@@ -60,7 +60,7 @@ let rec eval s localEnv =
         match lookup (localEnv @ globalEnv) x with
         | Some v -> v
         | None -> raise (Lerror ("Undefined variable " + x))
-  | Number value -> Number value
+  | Number value -> Number value // Integers
   | Cons (Symbol "quote", Cons (v, Nil)) -> v
   | Cons (Symbol "lambda", rules) -> s
   | Cons (Symbol "define", Cons (Symbol x, Cons (e, Nil))) ->
@@ -89,6 +89,133 @@ let rec eval s localEnv =
           | _ -> raise (Lerror ("Error while reading " + f + ".le"))
         ; infile.Close (); Nil
       with _ -> raise (Lerror ("Could not open file " + f + ".le"))
+  | Cons (Symbol "+", exp) -> // Plus branch >
+    match exp with
+    | Nil -> Number 0
+    | Cons (Number i1, exp) ->
+      match eval (Cons (Symbol "+", exp)) localEnv with
+      | Number i2 -> Number ((i1) + (i2))
+      | _ -> raise (Lerror ("Bad '+' operation"))
+    | Cons (Symbol x, e) ->
+      match eval (Cons (Symbol "+", e)) localEnv with
+      | Number i2 ->
+        match lookup (localEnv @ globalEnv) x with
+        | Some (Number i1) -> Number ((i1)+(i2))
+        | _ -> raise (Lerror ("Bad '+' operation"))
+      | _ -> raise (Lerror ("Bad '+' operation"))
+    | Cons (x,y) ->
+      match (eval x localEnv, eval y localEnv) with
+      | (Number i1, Nil) -> Number i1
+      | (Number i1, Number i2) -> Number ((i1)+(i2))
+      | (Symbol a, Nil) ->
+        match lookup (localEnv @ globalEnv) a with
+        | Some (Number i1) -> Number (i1)
+        | _ -> raise (Lerror ("Bad '+' operation"))
+      | (Symbol a, Symbol b) ->
+        match (lookup (localEnv @ globalEnv) a, lookup (localEnv @ globalEnv) b) with
+        | (Some (Number i1), Some (Number i2)) -> Number ((i1)+(i2))
+        |_ -> raise (Lerror ("Bad '+' operation"))
+      | (Number i1, Symbol a) | (Symbol a, Number i1) ->
+        match lookup (localEnv @ globalEnv) a with
+        | Some (Number i2) -> Number ((i1)+(i2))
+        | _ -> raise (Lerror ("Bad '+' operation"))
+      | _ -> raise (Lerror ("Bad '+' operation"))
+    | _ -> raise (Lerror ("Bad '+' operation"))
+  | Cons (Symbol "-", exp) -> // Minus branch >
+      match exp with
+      | Nil -> Number 0
+      | Cons (i1, Nil) ->
+        match (eval i1 localEnv) with
+        | Number i1 -> Number i1
+        | _ -> raise (Lerror ("Bad '-' operation"))
+      | Cons (Number i1, exp) ->
+        match eval (Cons (Symbol "+", exp)) localEnv with
+        | Number i2 -> Number ((i1) - (i2))
+        | _ -> raise (Lerror ("Bad '-' operation"))
+      | Cons (Symbol x, e) ->
+        match eval (Cons (Symbol "-", e)) localEnv with
+        | Number i2 ->
+          match lookup (localEnv @ globalEnv) x with
+          | Some (Number i1) -> Number ((i1)-(i2))
+          | _ -> raise (Lerror ("Bad '-' operation"))
+        | _ -> raise (Lerror ("Bad '-' operation"))
+      | Cons (x,y) ->
+        match (eval x localEnv, eval y localEnv) with
+        | (Number i1, Number i2) -> Number ((i1)-(i2))
+        | (Number i1, Nil) -> Number i1
+        | (Symbol a, Nil) ->
+          match lookup (localEnv @ globalEnv) a with
+          | Some (Number i1) -> Number (i1)
+          | _ -> raise (Lerror ("Bad '-' operation"))
+        | (Symbol a, Symbol b) ->
+          match (lookup (localEnv @ globalEnv) a, lookup (localEnv @ globalEnv) b) with
+          | (Some (Number i1), Some (Number i2)) -> Number ((i1)-(i2))
+          |_ -> raise (Lerror ("Bad '-' operation"))
+        | (Number i1, Symbol a) | (Symbol a, Number i1) ->
+          match lookup (localEnv @ globalEnv) a with
+          | Some (Number i2) -> Number ((i1)-(i2))
+          | _ -> raise (Lerror ("Bad '-' operation"))
+        | _ -> raise (Lerror ("Bad '-' operation"))
+      | _ -> raise (Lerror ("Bad '-' operation"))
+  | Cons (Symbol "*", exp) -> // Mult branch >
+    match exp with
+    | Nil -> Number 1
+    | Cons (Number i1, exp) ->
+      match eval (Cons (Symbol "*", exp)) localEnv with
+      | Number i2 -> Number ((i1) * (i2))
+      | _ -> raise (Lerror ("Bad '*' operation"))
+    | Cons (x,y) ->
+      match (eval x localEnv, eval y localEnv) with
+      | (Number i1, Number i2) -> Number ((i1) * (i2))
+      | (Number i1, Nil) -> Number i1
+      | (Symbol a, Nil) ->
+        match lookup (localEnv @ globalEnv) a with
+        | Some (Number i1) -> Number (i1)
+        | _ -> raise (Lerror ("Bad '*' operation"))
+      | (Symbol a, Symbol b) ->
+        match (lookup (localEnv @ globalEnv) a, lookup (localEnv @ globalEnv) b) with
+        | (Some (Number i1), Some (Number i2)) -> Number ((i1) * (i2))
+        |_ -> raise (Lerror ("Bad '*' operation"))
+      | (Number i1, Symbol a) | (Symbol a, Number i1) ->
+        match lookup (localEnv @ globalEnv) a with
+        | Some (Number i2) -> Number ((i1) * (i2))
+        | _ -> raise (Lerror ("Bad '*' operation"))
+      | _ -> raise (Lerror ("Bad '*' operation"))
+    | _ -> raise (Lerror ("Bad '*' operation"))
+  | Cons (Symbol "/", exp) -> // Mult branch >
+    match exp with
+    | Nil -> Number 1
+    | Cons (Number i1, exp) ->
+      match eval (Cons (Symbol "/", exp)) localEnv with
+      | Number 0 -> raise (Lerror ("ERROR: division by zero"))
+      | Number i2 -> Number ((i1) / (i2))
+      | _ -> raise (Lerror ("Bad '/' operation"))
+    | Cons (Symbol x, e) ->
+      match eval (Cons (Symbol "/", e)) localEnv with
+      | Number i2 ->
+        match lookup (localEnv @ globalEnv) x with
+        | Some (Number i1) -> Number ((i1) / (i2))
+        | _ -> raise (Lerror ("Bad '/' operation"))
+      | _ -> raise (Lerror ("Bad '/' operation"))
+    | Cons (x,y) ->
+      match (eval x localEnv, eval y localEnv) with
+      | (Number i1, Nil) -> Number i1
+      | (Number i1, Number i2) -> Number ((i1) / (i2))
+      | (Symbol a, Nil) ->
+        match lookup (localEnv @ globalEnv) a with
+        | Some (Number i1) -> Number (i1)
+        | _ -> raise (Lerror ("Bad '/' operation"))
+      | (Symbol a, Symbol b) ->
+        match (lookup (localEnv @ globalEnv) a, lookup (localEnv @ globalEnv) b) with
+        | (Some (Number i1), Some (Number i2)) -> Number ((i1) / (i2))
+        |_ -> raise (Lerror ("Bad '/' operation"))
+      | (Number i1, Symbol a) | (Symbol a, Number i1) ->
+        match lookup (localEnv @ globalEnv) a with
+        | Some (Number i2) -> Number ((i1) / (i2))
+        | _ -> raise (Lerror ("Bad '/' operation"))
+      | _ -> raise (Lerror ("Bad '/' operation"))
+    | _ -> raise (Lerror ("Bad '/' operation"))
+  | Cons (i, Nil) -> i // Plus branch
   | Cons (Symbol x, pars) when List.contains x keywords ->
       raise (Lerror ("malformed " + x + " expression"))
   | Cons (e1, pars) -> // function application
