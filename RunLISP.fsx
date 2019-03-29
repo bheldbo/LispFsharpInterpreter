@@ -17,7 +17,8 @@ open Sexp;;
 // Global environment (initially empty)
 
 let mutable globalEnv = []
-
+//let mutable max = System.Int32.MinValue
+//let mutable min = System.Int32.MaxValue
 // look up variable in environment
 // environment is represented as list of (name,value) pairs
 
@@ -45,12 +46,15 @@ let updateGlobal x v =
 exception Lerror of string
 
 // list of keywords
-let keywords = ["quote"; "lambda"; "define"; "cons"; "save"; "load"; "+"; "-"; "*"; "/"]
+let keywords = ["quote"; "lambda"; "define"; "cons"; "save";
+                "load"; "+"; "-"; "*"; "/"; "="; "<"; ">"; "/=";
+                ">="; "<="; "max"; "min"; "mod"]
 
 // evaluate Sexp to Sexp in local environment
 // if error raise exception Lerror message
 
 let rec eval s localEnv =
+  printfn "%A" s
   match s with
   | Nil -> Nil
   | Symbol x -> // keyword or variable
@@ -96,14 +100,7 @@ let rec eval s localEnv =
       match eval (Cons (Symbol "+", exp)) localEnv with
       | Number i2 -> Number ((i1) + (i2))
       | _ -> raise (Lerror ("Bad '+' operation"))
-    | Cons (Symbol x, e) ->
-      match eval (Cons (Symbol "+", e)) localEnv with
-      | Number i2 ->
-        match lookup (localEnv @ globalEnv) x with
-        | Some (Number i1) -> Number ((i1)+(i2))
-        | _ -> raise (Lerror ("Bad '+' operation"))
-      | _ -> raise (Lerror ("Bad '+' operation"))
-    | Cons (x,y) ->
+    | Cons (x, y) ->
       match (eval x localEnv, eval y localEnv) with
       | (Number i1, Nil) -> Number i1
       | (Number i1, Number i2) -> Number ((i1)+(i2))
@@ -132,13 +129,6 @@ let rec eval s localEnv =
         match eval (Cons (Symbol "+", exp)) localEnv with
         | Number i2 -> Number ((i1) - (i2))
         | _ -> raise (Lerror ("Bad '-' operation"))
-      | Cons (Symbol x, e) ->
-        match eval (Cons (Symbol "-", e)) localEnv with
-        | Number i2 ->
-          match lookup (localEnv @ globalEnv) x with
-          | Some (Number i1) -> Number ((i1)-(i2))
-          | _ -> raise (Lerror ("Bad '-' operation"))
-        | _ -> raise (Lerror ("Bad '-' operation"))
       | Cons (x,y) ->
         match (eval x localEnv, eval y localEnv) with
         | (Number i1, Number i2) -> Number ((i1)-(i2))
@@ -159,12 +149,12 @@ let rec eval s localEnv =
       | _ -> raise (Lerror ("Bad '-' operation"))
   | Cons (Symbol "*", exp) -> // Mult branch >
     match exp with
-    | Nil -> Number 1
+    | Nil -> Number 1 // Nil always 1 to preserve exp
     | Cons (Number i1, exp) ->
       match eval (Cons (Symbol "*", exp)) localEnv with
       | Number i2 -> Number ((i1) * (i2))
       | _ -> raise (Lerror ("Bad '*' operation"))
-    | Cons (x,y) ->
+    | Cons (x, y) ->
       match (eval x localEnv, eval y localEnv) with
       | (Number i1, Number i2) -> Number ((i1) * (i2))
       | (Number i1, Nil) -> Number i1
@@ -182,22 +172,39 @@ let rec eval s localEnv =
         | _ -> raise (Lerror ("Bad '*' operation"))
       | _ -> raise (Lerror ("Bad '*' operation"))
     | _ -> raise (Lerror ("Bad '*' operation"))
-  | Cons (Symbol "/", exp) -> // Mult branch >
+  | Cons (Symbol "/=", exp) -> // comparison branch
     match exp with
     | Nil -> Number 1
+    | Cons (x, y) ->
+      match (eval x localEnv, eval y localEnv) with
+      | (Number i1, Nil) -> Symbol "nil"
+      | (Number i1, Number i2) -> if ((i1) <> (i2))
+                                  then Symbol "t" else Symbol "nil"
+      | (Symbol a, Nil) ->
+        match lookup (localEnv @ globalEnv) a with
+        | Some (Number i1) -> Number i1
+        | _ -> raise (Lerror ("Bad comparison '/='"))
+      | (Symbol a, Symbol b) ->
+        match (lookup (localEnv @ globalEnv) a, lookup (localEnv @ globalEnv) b) with
+        | (Some (Number i1), Some (Number i2)) -> if ((i1) <> (i2)) then
+                                                    Symbol "t" else Symbol "nil"
+        |_ -> raise (Lerror ("Bad comparison '/='"))
+      | (Number i1, Symbol a) | (Symbol a, Number i1) ->
+        match lookup (localEnv @ globalEnv) a with
+        | Some (Number i2) -> if ((i1) <> (i2)) then
+                                Symbol "t" else Symbol "nil"
+        | _ -> raise (Lerror ("Bad comparison '/='"))
+      | _ -> raise (Lerror ("Bad comparison '/='"))
+    | _ -> raise (Lerror ("Bad comparison '/="))
+  | Cons (Symbol "/", exp) -> // Mult branch >
+    match exp with
+    | Nil -> Number 1 // to avoid division by zero
     | Cons (Number i1, exp) ->
       match eval (Cons (Symbol "/", exp)) localEnv with
       | Number 0 -> raise (Lerror ("ERROR: division by zero"))
       | Number i2 -> Number ((i1) / (i2))
       | _ -> raise (Lerror ("Bad '/' operation"))
-    | Cons (Symbol x, e) ->
-      match eval (Cons (Symbol "/", e)) localEnv with
-      | Number i2 ->
-        match lookup (localEnv @ globalEnv) x with
-        | Some (Number i1) -> Number ((i1) / (i2))
-        | _ -> raise (Lerror ("Bad '/' operation"))
-      | _ -> raise (Lerror ("Bad '/' operation"))
-    | Cons (x,y) ->
+    | Cons (x, y) ->
       match (eval x localEnv, eval y localEnv) with
       | (Number i1, Nil) -> Number i1
       | (Number i1, Number i2) -> Number ((i1) / (i2))
@@ -215,6 +222,187 @@ let rec eval s localEnv =
         | _ -> raise (Lerror ("Bad '/' operation"))
       | _ -> raise (Lerror ("Bad '/' operation"))
     | _ -> raise (Lerror ("Bad '/' operation"))
+  | Cons (Symbol "=", exp) -> // comparison branch
+    match exp with
+    | Nil -> Number 1
+    | Cons (x, y) ->
+      match (eval x localEnv, eval y localEnv) with
+      | (Number i1, Nil) -> Symbol "nil"
+      | (Number i1, Number i2) -> if ((i1) = (i2)) then Symbol "t" else Symbol "nil"
+      | (Symbol a, Nil) ->
+        match lookup (localEnv @ globalEnv) a with
+        | Some (Number i1) -> Number i1
+        | _ -> raise (Lerror ("Bad comparison '='"))
+      | (Symbol a, Symbol b) ->
+        match (lookup (localEnv @ globalEnv) a, lookup (localEnv @ globalEnv) b) with
+        | (Some (Number i1), Some (Number i2)) -> if ((i1) = (i2)) then
+                                                    Symbol "t" else Symbol "nil"
+        |_ -> raise (Lerror ("Bad comparison '='"))
+      | (Number i1, Symbol a) | (Symbol a, Number i1) ->
+        match lookup (localEnv @ globalEnv) a with
+        | Some (Number i2) -> if ((i1) = (i2)) then
+                                Symbol "t" else Symbol "nil"
+        | _ -> raise (Lerror ("Bad comparison '='"))
+      | _ -> raise (Lerror ("Bad comparison '='"))
+    | _ -> raise (Lerror ("Bad comparison '='"))
+  | Cons (Symbol "<", exp) -> // comparison branch
+    match exp with
+    | Nil -> Number 1
+    | Cons (x, y) ->
+      match (eval x localEnv, eval y localEnv) with
+      | (Number i1, Nil) -> Symbol "nil"
+      | (Number i1, Number i2) -> if ((i1) < (i2)) then Symbol "t" else Symbol "nil"
+      | (Symbol a, Nil) ->
+        match lookup (localEnv @ globalEnv) a with
+        | Some (Number i1) -> Number i1
+        | _ -> raise (Lerror ("Bad comparison '<'"))
+      | (Symbol a, Symbol b) ->
+        match (lookup (localEnv @ globalEnv) a, lookup (localEnv @ globalEnv) b) with
+        | (Some (Number i1), Some (Number i2)) -> if ((i1) < (i2)) then
+                                                    Symbol "t" else Symbol "nil"
+        |_ -> raise (Lerror ("Bad comparison '<'"))
+      | (Number i1, Symbol a) | (Symbol a, Number i1) ->
+        match lookup (localEnv @ globalEnv) a with
+        | Some (Number i2) -> if ((i1) < (i2)) then
+                                Symbol "t" else Symbol "nil"
+        | _ -> raise (Lerror ("Bad comparison '<'"))
+      | _ -> raise (Lerror ("Bad comparison '<'"))
+    | _ -> raise (Lerror ("Bad comparison '<"))
+  | Cons (Symbol ">", exp) -> // comparison branch
+    match exp with
+    | Nil -> Number 1
+    | Cons (x, y) ->
+      match (eval x localEnv, eval y localEnv) with
+      | (Number i1, Nil) -> Symbol "nil"
+      | (Number i1, Number i2) -> if ((i1) > (i2)) && ((i2) < (i1))
+                                  then Symbol "t" else Symbol "nil"
+      | (Symbol a, Nil) ->
+        match lookup (localEnv @ globalEnv) a with
+        | Some (Number i1) -> Number i1
+        | _ -> raise (Lerror ("Bad comparison '>'"))
+      | (Symbol a, Symbol b) ->
+        match (lookup (localEnv @ globalEnv) a, lookup (localEnv @ globalEnv) b) with
+        | (Some (Number i1), Some (Number i2)) -> if ((i1) > (i2)) && ((i2) < (i1)) then
+                                                    Symbol "t" else Symbol "nil"
+        |_ -> raise (Lerror ("Bad comparison '>'"))
+      | (Number i1, Symbol a) | (Symbol a, Number i1) ->
+        match lookup (localEnv @ globalEnv) a with
+        | Some (Number i2) -> if ((i1) > (i2)) then
+                                Symbol "t" else Symbol "nil"
+        | _ -> raise (Lerror ("Bad comparison '>'"))
+      | _ -> raise (Lerror ("Bad comparison '>'"))
+    | _ -> raise (Lerror ("Bad comparison '>"))
+  | Cons (Symbol ">=", exp) -> // comparison branch
+    match exp with
+    | Nil -> Number 1
+    | Cons (x, y) ->
+      match (eval x localEnv, eval y localEnv) with
+      | (Number i1, Nil) -> Symbol "nil"
+      | (Number i1, Number i2) -> if ((i1) >= (i2))
+                                  then Symbol "t" else Symbol "nil"
+      | (Symbol a, Nil) ->
+        match lookup (localEnv @ globalEnv) a with
+        | Some (Number i1) -> Number i1
+        | _ -> raise (Lerror ("Bad comparison '>'"))
+      | (Symbol a, Symbol b) ->
+        match (lookup (localEnv @ globalEnv) a, lookup (localEnv @ globalEnv) b) with
+        | (Some (Number i1), Some (Number i2)) -> if ((i1) >= (i2)) then
+                                                    Symbol "t" else Symbol "nil"
+        |_ -> raise (Lerror ("Bad comparison '>'"))
+      | (Number i1, Symbol a) | (Symbol a, Number i1) ->
+        match lookup (localEnv @ globalEnv) a with
+        | Some (Number i2) -> if ((i1) >= (i2)) then
+                                Symbol "t" else Symbol "nil"
+        | _ -> raise (Lerror ("Bad comparison '>'"))
+      | _ -> raise (Lerror ("Bad comparison '>'"))
+    | _ -> raise (Lerror ("Bad comparison '>"))
+  | Cons (Symbol "<=", exp) -> // comparison branch
+    match exp with
+    | Nil -> Number 1
+    | Cons (x, y) ->
+      match (eval x localEnv, eval y localEnv) with
+      | (Number i1, Nil) -> Symbol "nil"
+      | (Number i1, Number i2) -> if ((i1) <= (i2))
+                                  then Symbol "t" else Symbol "nil"
+      | (Symbol a, Nil) ->
+        match lookup (localEnv @ globalEnv) a with
+        | Some (Number i1) -> Number i1
+        | _ -> raise (Lerror ("Bad comparison '>'"))
+      | (Symbol a, Symbol b) ->
+        match (lookup (localEnv @ globalEnv) a, lookup (localEnv @ globalEnv) b) with
+        | (Some (Number i1), Some (Number i2)) -> if ((i1) <= (i2)) then
+                                                    Symbol "t" else Symbol "nil"
+        |_ -> raise (Lerror ("Bad comparison '>'"))
+      | (Number i1, Symbol a) | (Symbol a, Number i1) ->
+        match lookup (localEnv @ globalEnv) a with
+        | Some (Number i2) -> if ((i1) <= (i2)) then
+                                Symbol "t" else Symbol "nil"
+        | _ -> raise (Lerror ("Bad comparison '>'"))
+      | _ -> raise (Lerror ("Bad comparison '>'"))
+    | _ -> raise (Lerror ("Bad comparison '>"))
+  | Cons (Symbol "max", exp) -> // comparison branch
+    match exp with
+    | Nil -> Number 1
+    | Cons (x, y) ->
+      match (eval x localEnv, eval y localEnv) with
+      | (Number i1, Nil) -> Number 1
+      | (Number i1, Number i2) -> Number (max i1 i2)
+      | (Symbol a, Nil) ->
+        match lookup (localEnv @ globalEnv) a with
+        | Some (Number i1) -> Number i1
+        | _ -> raise (Lerror ("Malformed max operation"))
+      | (Symbol a, Symbol b) ->
+        match (lookup (localEnv @ globalEnv) a, lookup (localEnv @ globalEnv) b) with
+        | (Some (Number i1), Some (Number i2)) -> Number (max i1 i2)
+        |_ -> raise (Lerror ("Malformed max operation"))
+      | (Number i1, Symbol a) | (Symbol a, Number i1) ->
+        match lookup (localEnv @ globalEnv) a with
+        | Some (Number i2) -> Number (max i1 i2)
+        | _ -> raise (Lerror ("Malformed max operation"))
+      | _ -> raise (Lerror ("Malformed max operation"))
+    | _ -> raise (Lerror ("Malformed max operation"))
+  | Cons (Symbol "min", exp) -> // comparison branch
+    match exp with
+    | Nil -> Number 0
+    | Cons (x, y) ->
+      match (eval x localEnv, eval y localEnv) with
+      | (Number i1, Nil) -> Number System.Int32.MaxValue
+      | (Number i1, Number i2) -> Number (min i1 i2)
+      | (Symbol a, Nil) ->
+        match lookup (localEnv @ globalEnv) a with
+        | Some (Number i1) -> Number i1
+        | _ -> raise (Lerror ("Malformed min operation"))
+      | (Symbol a, Symbol b) ->
+        match (lookup (localEnv @ globalEnv) a, lookup (localEnv @ globalEnv) b) with
+        | (Some (Number i1), Some (Number i2)) -> Number (min i1 i2)
+        |_ -> raise (Lerror ("Malformed min operation"))
+      | (Number i1, Symbol a) | (Symbol a, Number i1) ->
+        match lookup (localEnv @ globalEnv) a with
+        | Some (Number i2) -> Number (min i1 i2)
+        | _ -> raise (Lerror ("Malformed min operation"))
+      | _ -> raise (Lerror ("Malformed min operation"))
+    | _ -> raise (Lerror ("Malformed min operation"))
+  | Cons (Symbol "mod", exp) -> // comparison branch
+    match exp with
+    | Nil -> Number 0
+    | Cons (x, y) ->
+      match (eval x localEnv, eval y localEnv) with
+      | (Number i1, Nil) -> Number 1
+      | (Number i1, Number i2) -> Number (i1 % i2)
+      | (Symbol a, Nil) ->
+        match lookup (localEnv @ globalEnv) a with
+        | Some (Number i1) -> Number i1
+        | _ -> raise (Lerror ("Malformed mod/rem operation"))
+      | (Symbol a, Symbol b) ->
+        match (lookup (localEnv @ globalEnv) a, lookup (localEnv @ globalEnv) b) with
+        | (Some (Number i1), Some (Number i2)) -> Number (i1 % i2)
+        |_ -> raise (Lerror ("Malformed mod/rem operation"))
+      | (Number i1, Symbol a) | (Symbol a, Number i1) ->
+        match lookup (localEnv @ globalEnv) a with
+        | Some (Number i2) -> Number (i1 % i2)
+        | _ -> raise (Lerror ("Malformed mod/rem operation"))
+      | _ -> raise (Lerror ("Malformed mod/rem operation"))
+    | _ -> raise (Lerror ("Malformed mod/rem operation"))
   | Cons (i, Nil) -> i // Plus branch
   | Cons (Symbol x, pars) when List.contains x keywords ->
       raise (Lerror ("malformed " + x + " expression"))
@@ -259,7 +447,6 @@ and matchPattern p v =
   | _ -> None
 
 // check if variable is repeated in pattern by comparing environments
-
 and disjoint env1 env2 =
   match env1 with
   | [] -> true

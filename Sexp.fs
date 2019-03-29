@@ -64,8 +64,7 @@ and readExp cs i len =
   if i = len then ErrorAt i
   else
     let c = cs.[i]
-    if 'a' <= c &&  c <= 'z'
-        || c = '+' || c = '-'  || c = '*' || c= '/' then // read symbol
+    if 'a' <= c &&  c <= 'z' then  // read symbol and then tail // Plus branch
       readSymbol (string c) cs (i+1) len
     else if '0' <= c && c <= '9' then // Integers
       readInt (int c) cs (i+1) len
@@ -100,7 +99,12 @@ and readSymbol name cs i len =
   if i = len then Success (Symbol name, i)
   else
     let c = cs.[i]
-    if 'a' <= c &&  c <= 'z' then readSymbol (name + string c) cs (i+1) len
+    if 'a' <= c &&  c <= 'z' || c = '+' || c = '-'  || c = '*' ||
+        c= '/'  || c = '=' || c = '<' ||
+        c = '>' then
+        readSymbol (name + string c) cs (i+1) len
+    else if c = 'm' || c = 'a' || c = 'i' || c= 'o' || c = 'x' || c = 'd' then
+        readSymbol (name + string c) cs (i+1) len
     else Success (Symbol name, i)
 
 // read list tail
@@ -111,8 +115,9 @@ and readTail cs i len  =
   else
     let c = cs.[i]
     if c = ')' then Success (Nil, i+1)  // end of list
-    else if 'a' <= c &&  c <= 'z'
-        || c = '+' || c = '-'  || c = '*' || c= '/' then  // read symbol and then tail // Plus branch
+    else  if 'a' <= c &&  c <= 'z' || c = '+' || c = '-'  || c = '*' ||
+            c= '/'  || c = '=' || c = '<' ||
+            c = '>' then   // read symbol and then tail // Plus branch
       match readSymbol (string c) cs (i+1) len with
       | ErrorAt j -> ErrorAt j
       | Success (sym, j) ->
